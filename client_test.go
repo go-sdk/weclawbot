@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-sdk/core/errx"
 	"github.com/go-sdk/core/restx"
@@ -118,6 +119,56 @@ func TestGetUpdatesSessionExpired(t *testing.T) {
 	testx.True(t, IsSessionExpired(err))
 }
 
+func TestReceiveMessages(t *testing.T) {
+	requests := 0
+	client := newTestClient(func(request *http.Request) (*http.Response, error) {
+		requests++
+		body, err := io.ReadAll(request.Body)
+		testx.NoError(t, err)
+		switch requests {
+		case 1:
+			testx.Contains(t, string(body), `"get_updates_buf":""`)
+			return response(http.StatusOK, `{"ret":0,"msgs":[],"get_updates_buf":"cursor-2","longpolling_timeout_ms":500}`), nil
+		case 2:
+			testx.Contains(t, string(body), `"get_updates_buf":"cursor-2"`)
+			deadline, ok := request.Context().Deadline()
+			testx.True(t, ok)
+			testx.True(t, time.Until(deadline) <= time.Second)
+			return response(http.StatusOK, `{"ret":0,"msgs":[{"message_id":"1"},{"message_id":"2"}],"get_updates_buf":"cursor-3"}`), nil
+		default:
+			t.Fatal("unexpected getUpdates request")
+			return nil, nil
+		}
+	}, WithBaseURL("https://api.example.com"), WithToken("bot-token"))
+
+	stop := errx.New("stop receiving")
+	received := []MessageID{}
+	err := client.ReceiveMessages(context.Background(), func(_ context.Context, message Message) error {
+		received = append(received, message.MessageID)
+		if message.MessageID == "2" {
+			return stop
+		}
+		return nil
+	})
+	testx.ErrorIs(t, err, stop)
+	testx.Equal(t, []MessageID{"1", "2"}, received)
+	testx.Equal(t, 2, requests)
+}
+
+func TestReceiveMessagesCanceled(t *testing.T) {
+	client := newTestClient(func(request *http.Request) (*http.Response, error) {
+		return nil, request.Context().Err()
+	}, WithBaseURL("https://api.example.com"), WithToken("bot-token"))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := client.ReceiveMessages(ctx, func(context.Context, Message) error {
+		t.Fatal("message handler must not be called")
+		return nil
+	})
+	testx.ErrorIs(t, err, context.Canceled)
+}
+
 func TestHTTPBaseURLRequiresExplicitOption(t *testing.T) {
 	client := newTestClient(func(request *http.Request) (*http.Response, error) {
 		t.Fatal("HTTP request must not be sent without WithInsecureHTTP")
@@ -171,4 +222,7 @@ func TestValidation(t *testing.T) {
 	_, err = New(WithToken("token")).SendText(context.Background(), SendTextRequest{})
 	testx.ErrorIs(t, err, ErrUserIDRequired)
 	testx.False(t, errx.Is(err, ErrTextRequired))
+
+	err = New(WithToken("token")).ReceiveMessages(context.Background(), nil)
+	testx.ErrorIs(t, err, ErrMessageHandlerRequired)
 }

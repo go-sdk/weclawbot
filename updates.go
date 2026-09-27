@@ -3,6 +3,7 @@ package weclawbot
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-sdk/core/errx"
 )
@@ -46,6 +47,33 @@ func (c *Client) GetUpdates(ctx context.Context, request GetUpdatesRequest) (*Ge
 		return result, responseError("get updates", result.Ret, result.ErrorCode)
 	}
 	return result, nil
+}
+
+// ReceiveMessages 持续接收消息并按服务端返回顺序交给 handler，直到发生错误或 ctx 结束。
+func (c *Client) ReceiveMessages(ctx context.Context, handler func(context.Context, Message) error) error {
+	if handler == nil {
+		return ErrMessageHandlerRequired
+	}
+	cursor := ""
+	var timeout time.Duration
+	for {
+		updates, err := c.GetUpdates(ctx, GetUpdatesRequest{
+			Cursor:  cursor,
+			Timeout: timeout,
+		})
+		if err != nil {
+			return err
+		}
+		cursor = updates.NextCursor(cursor)
+		if nextTimeout := updates.LongPollingTimeout(); nextTimeout > 0 {
+			timeout = nextTimeout
+		}
+		for _, message := range updates.Messages {
+			if err := handler(ctx, message); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 // NextCursor 返回服务端提供的非空游标；空游标时保留当前值。

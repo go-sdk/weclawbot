@@ -15,6 +15,8 @@ var (
 	ErrUserIDRequired = errx.New("user id is required")
 	// ErrTextRequired 表示文本消息内容为空。
 	ErrTextRequired = errx.New("text is required")
+	// ErrMessageHandlerRequired 表示持续接收消息时缺少消息处理函数。
+	ErrMessageHandlerRequired = errx.New("message handler is required")
 	// ErrTooManyLocalTokens 表示二维码请求携带了超过协议上限的本地 Token。
 	ErrTooManyLocalTokens = errx.New("too many local tokens")
 	// ErrInvalidURL 表示 API 地址或重定向地址不安全或无效。

@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-`github.com/go-sdk/weclawbot` 是微信 ClawBot HTTP JSON 协议客户端，提供二维码登录、消息长轮询和文本消息发送能力。SDK 不管理账号文件或后台循环，调用方负责保存凭证、游标和消息上下文。
+`github.com/go-sdk/weclawbot` 是微信 ClawBot HTTP JSON 协议客户端，提供二维码登录、消息长轮询和文本消息发送能力。SDK 不管理账号文件；`ReceiveMessages` 在调用期间管理长轮询和游标，调用方负责保存凭证和消息上下文。
 
 ## 目录结构
 
@@ -53,6 +53,12 @@ Client.GetUpdates
     -> 返回消息、下一游标和建议超时
     -> 从消息取得 from_user_id 和 context_token
 
+Client.ReceiveMessages
+    -> 循环调用 Client.GetUpdates
+    -> 自动维护非空游标和服务端建议超时
+    -> 按顺序调用消息处理函数
+    -> 处理错误、查询错误或 Context 结束时退出
+
 Client.SendText
     -> core/seq.UUID 生成 client_id
     -> 构造 Bot 完成态文本消息
@@ -60,7 +66,7 @@ Client.SendText
     -> 返回本地 client_id 和服务端 message_id
 ```
 
-`GetUpdatesResponse.NextCursor` 只接受服务端非空游标。`ret` 或 `errcode` 为 `-14` 时返回 `ErrSessionExpired`，由调用方决定重新登录或退避。
+`GetUpdatesResponse.NextCursor` 只接受服务端非空游标。`ReceiveMessages` 只在当前调用期间保存游标，不持久化状态，也不隐藏查询或消息处理错误。`ret` 或 `errcode` 为 `-14` 时返回 `ErrSessionExpired`，由调用方决定重新登录或退避。
 
 ## 公共请求行为
 

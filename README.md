@@ -84,30 +84,24 @@ SDK 不读取终端输入、不自动刷新二维码，也不保存 `BotToken`�
 
 ## 接收消息
 
-`GetUpdates` 每次执行一次长轮询。首次请求使用空游标，之后回传服务端返回的非空游标：
+`ReceiveMessages` 持续执行长轮询，自动维护游标并采用服务端建议的下一次超时。调用方只需处理收到的消息：
 
 ```go
-cursor := ""
-
-for {
-	updates, err := botClient.GetUpdates(ctx, weclawbot.GetUpdatesRequest{
-		Cursor: cursor,
-	})
-	if err != nil {
-		if weclawbot.IsSessionExpired(err) {
-			return relogin()
-		}
-		return err
+err := botClient.ReceiveMessages(ctx, func(ctx context.Context, message weclawbot.Message) error {
+	fmt.Println(message.FromUserID, message.ContextToken)
+	return nil
+})
+if err != nil {
+	if weclawbot.IsSessionExpired(err) {
+		return relogin()
 	}
-
-	cursor = updates.NextCursor(cursor)
-	for _, message := range updates.Messages {
-		fmt.Println(message.FromUserID, message.ContextToken)
-	}
+	return err
 }
 ```
 
-服务端可能通过 `longpolling_timeout_ms` 建议下一次超时，可使用 `updates.LongPollingTimeout()` 读取。单次内部长轮询超时返回空消息；调用方主动取消仍返回 `context.Canceled` 或 `context.DeadlineExceeded`。
+消息按服务端返回顺序串行处理。处理函数返回错误、消息查询失败或 `ctx` 结束时，`ReceiveMessages` 停止并返回对应错误。空消息和单次内部长轮询超时会自动继续；SDK 只在本次调用期间维护游标，不会持久化游标。
+
+需要自行控制单次轮询、游标或超时时，可以继续直接调用 `GetUpdates`。服务端建议的下一次超时可通过 `GetUpdatesResponse.LongPollingTimeout()` 读取。
 
 消息中的 `message_id` 和 `msg_id` 使用 `MessageID` 字符串类型，无损兼容服务端返回的 JSON 数字或字符串。
 
@@ -172,7 +166,7 @@ Client 保持 `core/restx` 的调试行为；启用调试模式可能输出请�
 ## 当前边界
 
 - 支持获取二维码、验证码回传、IDC 重定向和登录确认。
-- 支持 `getUpdates` 游标、服务端建议超时和 `-14` 会话失效。
+- 支持持续接收消息，也支持直接调用 `getUpdates` 控制游标和超时。
 - 支持接收文本消息和发送文本消息。
 - 不持久化账号、Token、游标或上下文。
 - 不实现图片、语音、文件和视频的上传、下载、解密或发送。
