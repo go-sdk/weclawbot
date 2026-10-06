@@ -3,7 +3,7 @@ module github.com/go-sdk/weclawbot
 go 1.27.0
 
 require (
-	github.com/go-sdk/core v1.6.1
+	github.com/go-sdk/core v1.6.2
 	github.com/mdp/qrterminal/v3 v3.2.1
 )
 
