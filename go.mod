@@ -3,7 +3,7 @@ module github.com/go-sdk/weclawbot
 go 1.27.0
 
 require (
-	github.com/go-sdk/core v1.6.1
+	github.com/go-sdk/core v1.6.3
 	github.com/mdp/qrterminal/v3 v3.2.1
 )
 
@@ -11,7 +11,7 @@ require (
 	github.com/brianvoe/gofakeit/v7 v7.17.1 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.15 // indirect
-	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/locales v0.14.2 // indirect
 	github.com/go-playground/universal-translator v0.18.2 // indirect
 	github.com/go-playground/validator/v10 v10.30.5 // indirect
 	github.com/go-resty/resty/v2 v2.17.2 // indirect
